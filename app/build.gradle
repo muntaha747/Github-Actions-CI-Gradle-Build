@@ -34,3 +34,13 @@ application {
     // Define the main class for the application.
     mainClass = 'org.example.App'
 }
+
+jar {
+    manifest {
+        attributes 'Main-Class': 'org.example.App'
+    }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
