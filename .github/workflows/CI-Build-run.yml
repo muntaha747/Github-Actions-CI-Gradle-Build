@@ -1,4 +1,4 @@
-name: Gradle Build and Run
+name: Only Gradle Build and Run
 
 on:
   push:
