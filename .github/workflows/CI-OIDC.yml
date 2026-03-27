@@ -35,7 +35,7 @@ jobs:
       run: ./gradlew build
 
     - name: Set Commit SHA
-      run: echo "COMMIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+      run: echo "COMMIT_SHA=$(git rev-parse --short HEAD)-${{ github.run_number }}" >> $GITHUB_ENV
 
     # ✅ OIDC Authentication (NO secrets required)
     - name: Configure AWS credentials (OIDC)
