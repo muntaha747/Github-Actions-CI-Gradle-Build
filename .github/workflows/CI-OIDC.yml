@@ -7,7 +7,7 @@ on:
 
 env:
   AWS_REGION: ca-central-1
-  ECR_REPOSITORY: gradle-hello-app
+  ECR_REPOSITORY: github-actions-ci-gradle-build
 
 permissions:
   id-token: write     # REQUIRED for OIDC
