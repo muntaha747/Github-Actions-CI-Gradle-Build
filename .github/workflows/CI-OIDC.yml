@@ -1,26 +1,40 @@
-name: Gradle Build and Push to ECR with OIDC
+name: Gradle Build, Push to ECR, and Terraform Deploy
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      tf_action:
+        description: "Terraform Action (apply/destroy)"
+        required: true
+        default: "apply"
 
 env:
   AWS_REGION: ca-central-1
-  ECR_REPOSITORY: github-actions-ci-gradle-build
+  ECR_REPOSITORY: gradle-hello-app
 
 permissions:
-  id-token: write     # REQUIRED for OIDC
+  id-token: write
   contents: read
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
 
     - name: Checkout Repository
       uses: actions/checkout@v4
+
+    - name: Set TF_ACTION
+      run: |
+        if [ "${{ github.event.inputs.tf_action }}" = "" ]; then
+          echo "TF_ACTION=apply" >> $GITHUB_ENV
+        else
+          echo "TF_ACTION=${{ github.event.inputs.tf_action }}" >> $GITHUB_ENV
+        fi
 
     - name: Setup Java
       uses: actions/setup-java@v4
@@ -35,33 +49,62 @@ jobs:
       run: ./gradlew build
 
     - name: Set Commit SHA
-      run: echo "COMMIT_SHA=$(git rev-parse --short HEAD)-${{ github.run_number }}" >> $GITHUB_ENV
+      run: echo "COMMIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-    # ✅ OIDC Authentication (NO secrets required)
-    - name: Configure AWS credentials (OIDC)
+    # OIDC Authentication
+    - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         role-to-assume: ${{ secrets.AWS_ASSUME_ROLE }}
         aws-region: ${{ env.AWS_REGION }}
 
     # Login to ECR
-    - name: Login to Amazon ECR
+    - name: Login to ECR
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
 
     # Build Docker image
     - name: Build Docker image
-      run: |
-        docker build -t $ECR_REPOSITORY:$COMMIT_SHA .
+      run: docker build -t $ECR_REPOSITORY:$COMMIT_SHA .
 
-    # Tag Docker image
+    #  Tag Docker image
     - name: Tag Docker image
       run: |
         docker tag $ECR_REPOSITORY:$COMMIT_SHA \
         ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$COMMIT_SHA
 
-    # Push image to ECR
-    - name: Push Docker image to ECR
+    # Push only on APPLY
+    - name: Push Docker image
+      if: env.TF_ACTION == 'apply'
       run: |
         docker push \
         ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$COMMIT_SHA
+
+    # =========================
+    #  TERRAFORM
+    # =========================
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    - name: Terraform Init
+      working-directory: infra
+      run: terraform init
+
+    # APPLY
+    - name: Terraform Apply
+      if: env.TF_ACTION == 'apply'
+      working-directory: infra
+      run: |
+        terraform plan \
+        -var="image_tag=${{ env.COMMIT_SHA }}" \
+        -out=tfplan
+        terraform apply -auto-approve tfplan
+
+    # 💣 DESTROY
+    - name: Terraform Destroy
+      if: env.TF_ACTION == 'destroy'
+      working-directory: infra
+      run: |
+        echo " Destroying infrastructure..."
+        terraform destroy -auto-approve
