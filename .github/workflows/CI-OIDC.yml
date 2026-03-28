@@ -96,9 +96,7 @@ jobs:
       if: env.TF_ACTION == 'apply'
       working-directory: infra
       run: |
-        terraform plan \
-        -var="image_tag=${{ env.COMMIT_SHA }}" \
-        -out=tfplan
+        terraform plan -out=tfplan
         terraform apply -auto-approve tfplan
 
     # 💣 DESTROY
