@@ -117,4 +117,6 @@ jobs:
     - name: Terraform Destroy
       if: env.TF_ACTION == 'destroy'
       working-directory: infra
-      run: terraform destroy -auto-approve -input=false
+      run: |
+        terraform destroy -auto-approve -input=false \
+        -var="image_uri_001=dummy"
