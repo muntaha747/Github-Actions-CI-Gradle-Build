@@ -48,12 +48,14 @@ jobs:
     - name: Build with Gradle
       run: ./gradlew build
 
-    - name: Set Commit SHA
-      run: echo "COMMIT_SHA=$(git rev-parse --short HEAD){{ github.run_number }}" >> $GITHUB_ENV
-    
+    # Proper IMAGE_TAG creation
     - name: Set IMAGE_TAG
-      run: echo "IMAGE_TAG=$(git rev-parse --short HEAD)-${{ github.run_number }}" >> $GITHUB_ENV 
-      
+      run: echo "IMAGE_TAG=$(git rev-parse --short HEAD)-${{ github.run_number }}" >> $GITHUB_ENV
+
+    # ✅ DEBUG (optional but useful)
+    - name: Debug IMAGE_TAG
+      run: echo "IMAGE_TAG=$IMAGE_TAG"
+
     # OIDC Authentication
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
@@ -66,22 +68,22 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
 
-    # Build Docker image
+    # Docker Build Image
     - name: Build Docker image
-      run: docker build -t $ECR_REPOSITORY:$IAMGE_TAG .
+      run: docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
 
-    #  Tag Docker image
+    # Docker Tag Image
     - name: Tag Docker image
       run: |
-        docker tag $ECR_REPOSITORY:$IAMGE_TAG  \
-        ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IAMGE_TAG 
+        docker tag $ECR_REPOSITORY:$IMAGE_TAG \
+        ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
 
-    # Push only on APPLY
+    # Docker Push Image 
     - name: Push Docker image
       if: env.TF_ACTION == 'apply'
       run: |
         docker push \
-        ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IAMGE_TAG 
+        ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
 
     # =========================
     #  TERRAFORM
@@ -102,10 +104,8 @@ jobs:
         terraform plan -out=tfplan
         terraform apply -auto-approve tfplan -var="image_tag=$IMAGE_TAG"
 
-    # 💣 DESTROY
+    # DESTROY
     - name: Terraform Destroy
       if: env.TF_ACTION == 'destroy'
       working-directory: infra
-      run: |
-        echo " Destroying infrastructure..."
-        terraform destroy -auto-approve
+      run: terraform destroy -auto-approve
