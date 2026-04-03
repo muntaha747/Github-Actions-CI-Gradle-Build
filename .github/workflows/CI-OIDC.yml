@@ -49,7 +49,7 @@ jobs:
       run: ./gradlew build
 
     - name: Set Commit SHA
-      run: echo "COMMIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+      run: echo "COMMIT_SHA=$(git rev-parse --short HEAD){{ github.run_number }}" >> $GITHUB_ENV
 
     # OIDC Authentication
     - name: Configure AWS credentials
@@ -65,20 +65,20 @@ jobs:
 
     # Build Docker image
     - name: Build Docker image
-      run: docker build -t $ECR_REPOSITORY:$COMMIT_SHA .
+      run: docker build -t $ECR_REPOSITORY:$IAMGE_TAG 
 
     #  Tag Docker image
     - name: Tag Docker image
       run: |
-        docker tag $ECR_REPOSITORY:$COMMIT_SHA \
-        ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$COMMIT_SHA
+        docker tag $ECR_REPOSITORY:$IAMGE_TAG  \
+        ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IAMGE_TAG 
 
     # Push only on APPLY
     - name: Push Docker image
       if: env.TF_ACTION == 'apply'
       run: |
         docker push \
-        ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$COMMIT_SHA
+        ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IAMGE_TAG 
 
     # =========================
     #  TERRAFORM
@@ -97,7 +97,7 @@ jobs:
       working-directory: infra
       run: |
         terraform plan -out=tfplan
-        terraform apply -auto-approve tfplan
+        terraform apply -auto-approve tfplan -var="image_tag=$IMAGE_TAG"
 
     # 💣 DESTROY
     - name: Terraform Destroy

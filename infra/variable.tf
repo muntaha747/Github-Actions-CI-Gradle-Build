@@ -27,3 +27,10 @@ variable "subnet02_ID" {
   type        = string
   default     = "subnet-02b35e6262141b0f7"
 }
+
+
+variable "image_tag" {
+  description = "Unique Image Tag"
+  type        = string
+  default = "${var.ecr_repo_url}:${var.image_tag}"
+}
