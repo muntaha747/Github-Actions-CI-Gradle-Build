@@ -25,9 +25,15 @@ jobs:
 
     steps:
 
+    # =========================
+    # CHECKOUT
+    # =========================
     - name: Checkout Repository
       uses: actions/checkout@v4
 
+    # =========================
+    # TF ACTION SET
+    # =========================
     - name: Set TF_ACTION
       run: |
         if [ "${{ github.event.inputs.tf_action }}" = "" ]; then
@@ -36,6 +42,9 @@ jobs:
           echo "TF_ACTION=${{ github.event.inputs.tf_action }}" >> $GITHUB_ENV
         fi
 
+    # =========================
+    # BUILD APP
+    # =========================
     - name: Setup Java
       uses: actions/setup-java@v4
       with:
@@ -48,22 +57,18 @@ jobs:
     - name: Build with Gradle
       run: ./gradlew build
 
-    # Proper IMAGE_TAG creation
+    # =========================
+    # IMAGE TAG + URI
+    # =========================
     - name: Set IMAGE_TAG
       run: echo "IMAGE_TAG=$(git rev-parse --short HEAD)-${{ github.run_number }}" >> $GITHUB_ENV
 
-    # ✅ DEBUG (optional but useful)
-    - name: Debug IMAGE_TAG
-      run: echo "IMAGE_TAG=$IMAGE_TAG"
-
-    # OIDC Authentication
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         role-to-assume: ${{ secrets.AWS_ASSUME_ROLE }}
         aws-region: ${{ env.AWS_REGION }}
 
-    # Login to ECR
     - name: Login to ECR
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
@@ -71,28 +76,25 @@ jobs:
     - name: Set IMAGE_URI
       run: |
         echo "IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_ENV
-        
-    # Docker Build Image
+
+    # =========================
+    # DOCKER BUILD & PUSH
+    # =========================
     - name: Build Docker image
       run: docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
 
-    # Docker Tag Image
     - name: Tag Docker image
       run: |
         docker tag $ECR_REPOSITORY:$IMAGE_TAG \
-        ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+        $IMAGE_URI
 
-    # Docker Push Image 
     - name: Push Docker image
       if: env.TF_ACTION == 'apply'
-      run: |
-        docker push \
-        ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+      run: docker push $IMAGE_URI
 
     # =========================
-    #  TERRAFORM
+    # TERRAFORM
     # =========================
-
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
 
@@ -105,12 +107,14 @@ jobs:
       if: env.TF_ACTION == 'apply'
       working-directory: infra
       run: |
-        terraform plan -out=tfplan
-        terraform apply -auto-approve tfplan -var="image_uri_001=$IMAGE_TAG"
+        terraform plan -input=false \
+          -var="image_uri_001=$IMAGE_URI" \
+          -out=tfplan
+
+        terraform apply -auto-approve tfplan
 
     # DESTROY
     - name: Terraform Destroy
       if: env.TF_ACTION == 'destroy'
       working-directory: infra
-      run: terraform destroy -auto-approve
-
+      run: terraform destroy -auto-approve -input=false
