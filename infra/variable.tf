@@ -32,4 +32,5 @@ variable "subnet02_ID" {
 variable "image_uri_001" {
   description = "Full ECR image URI"
   type        = string
+  default     = "dummy"
 }
