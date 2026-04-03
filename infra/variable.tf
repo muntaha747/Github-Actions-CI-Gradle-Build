@@ -29,8 +29,7 @@ variable "subnet02_ID" {
 }
 
 
-variable "image_tag" {
-  description = "Unique Image Tag"
+variable "image_uri" {
+  description = "Full ECR image URI"
   type        = string
-  default = "${var.ecr_repo_url}:${var.image_tag}"
 }
