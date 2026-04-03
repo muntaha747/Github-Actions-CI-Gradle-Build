@@ -29,7 +29,7 @@ variable "subnet02_ID" {
 }
 
 
-variable "image_uri" {
+variable "image_uri_001" {
   description = "Full ECR image URI"
   type        = string
 }
