@@ -65,7 +65,7 @@ jobs:
 
     # Build Docker image
     - name: Build Docker image
-      run: docker build -t $ECR_REPOSITORY:$IAMGE_TAG 
+      run: docker build -t $ECR_REPOSITORY:$IAMGE_TAG .
 
     #  Tag Docker image
     - name: Tag Docker image
