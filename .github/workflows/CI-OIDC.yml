@@ -50,7 +50,10 @@ jobs:
 
     - name: Set Commit SHA
       run: echo "COMMIT_SHA=$(git rev-parse --short HEAD){{ github.run_number }}" >> $GITHUB_ENV
-
+    
+    - name: Set IMAGE_TAG
+      run: echo "IMAGE_TAG=$(git rev-parse --short HEAD)-${{ github.run_number }}" >> $GITHUB_ENV 
+      
     # OIDC Authentication
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
