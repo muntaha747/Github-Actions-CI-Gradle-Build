@@ -120,3 +120,5 @@ jobs:
       run: |
         terraform destroy -auto-approve -input=false \
         -var="image_uri_001=dummy"
+
+        
