@@ -1,33 +1,59 @@
+########################################################################################
+#NAME OF THE USER INTERFACE FOR CICD PIPELINE
+########################################################################################
 name: Gradle Build, Push to ECR, and Terraform Deploy
 
+########################################################################################
+#RUNS ON WHICH MACHINE AND GIT BRANCH WHERE THE PIPELINE WILL BE ESCALATED.
+########################################################################################
 on:
   push:
     branches:
       - main
+
+########################################################################################
+#ALLOW MANUAL RUN FROM GITHUB UI
+########################################################################################
   workflow_dispatch:
+
+########################################################################################
+#ASKING USER WHAT YOU WANT TO DO?
+########################################################################################
     inputs:
       tf_action:
         description: "Terraform Action (apply/destroy)"
         required: true
         default: "apply"
 
+########################################################################################
+#GLOBAL VARIABLES FOR AWS ECR REGISTRY
+########################################################################################
 env:
   AWS_REGION: ca-central-1
   ECR_REPOSITORY: github-actions-ci-gradle-build
 
+########################################################################################
+#AWS OIDC LOGIN PERMISSIONS.
+########################################################################################
 permissions:
   id-token: write
   contents: read
 
+########################################################################################
+#JOBS TO PERFORM IN THE ACTION
+########################################################################################
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
+########################################################################################
+#LIST OF ACTIONS TO PERFORM.
+########################################################################################
     steps:
 
-    # =========================
-    # CHECKOUT
-    # =========================
+    # ================================
+    # CHECKOUT YOUR CURRENT REPOSITORY
+    # ================================
     - name: Checkout Repository
       uses: actions/checkout@v4
 
@@ -43,7 +69,7 @@ jobs:
         fi
 
     # =========================
-    # BUILD APP
+    # BUILD EXECUTEABLE BINARY
     # =========================
     - name: Setup Java
       uses: actions/setup-java@v4
@@ -58,17 +84,23 @@ jobs:
       run: ./gradlew build
 
     # =========================
-    # IMAGE TAG + URI
+    # SETUP IMAGE TAG + URI
     # =========================
     - name: Set IMAGE_TAG
       run: echo "IMAGE_TAG=$(git rev-parse --short HEAD)-${{ github.run_number }}" >> $GITHUB_ENV
 
+    # =========================
+    # CREATE IAM ROLE
+    # =========================
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         role-to-assume: ${{ secrets.AWS_ASSUME_ROLE }}
         aws-region: ${{ env.AWS_REGION }}
 
+    # =========================
+    # LOGIN INTO ECR
+    # =========================
     - name: Login to ECR
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2

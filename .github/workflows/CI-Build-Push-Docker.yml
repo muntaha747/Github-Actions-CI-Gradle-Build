@@ -1,68 +1,68 @@
-# #We are replacing this simply gradle build and add more code to build the docker images and push into docker registry.
-# name: Gradle Build and Push to ECR
+#We are replacing this simply gradle build and add more code to build the docker images and push into docker registry.
+name: Gradle Build and Push to ECR
 
-# on:
-#   push:
-#     branches:
-#       - main
+on:
+  push:
+    branches:
+      - main
 
-# env:
-#   AWS_REGION: ca-central-1
-#   ECR_REPOSITORY: github-actions-ci-gradle-build
-#   IMAGE_TAG: version02
+env:
+  AWS_REGION: ca-central-1
+  ECR_REPOSITORY: github-actions-ci-gradle-build
+  IMAGE_TAG: version02
 
-# jobs:
-#   build:
-#     runs-on: ubuntu-latest
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-#     steps:
+    steps:
 
-#     - name: Checkout Repository
-#       uses: actions/checkout@v4
+    - name: Checkout Repository
+      uses: actions/checkout@v4
 
-#     - name: Setup Java
-#       uses: actions/setup-java@v4
-#       with:
-#         distribution: temurin
-#         java-version: '17'
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '17'
 
-#     - name: Grant execute permission for Gradle
-#       run: chmod +x gradlew
+    - name: Grant execute permission for Gradle
+      run: chmod +x gradlew
 
-#     - name: Build with Gradle
-#       run: ./gradlew build
+    - name: Build with Gradle
+      run: ./gradlew build
 
-#     # Extract short commit id
-#     - name: Set Commit SHA
-#       id: vars
-#       run: echo "COMMIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+    # Extract short commit id
+    - name: Set Commit SHA
+      id: vars
+      run: echo "COMMIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-#     # Configure AWS credentials
-#     - name: Configure AWS credentials
-#       uses: aws-actions/configure-aws-credentials@v4
-#       with:
-#         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#         aws-region: ${{ env.AWS_REGION }}
+    # Configure AWS credentials
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
 
-#     # Login to ECR
-#     - name: Login to Amazon ECR
-#       id: login-ecr
-#       uses: aws-actions/amazon-ecr-login@v2
+    # Login to ECR
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
 
-#     # Build Docker Image
-#     - name: Build Docker image
-#       run: |
-#         docker build -t $ECR_REPOSITORY:$COMMIT_SHA .
+    # Build Docker Image
+    - name: Build Docker image
+      run: |
+        docker build -t $ECR_REPOSITORY:$COMMIT_SHA .
 
-#     # Tag image for ECR
-#     - name: Tag Docker image
-#       run: |
-#         docker tag $ECR_REPOSITORY:$COMMIT_SHA \
-#         ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$COMMIT_SHA
+    # Tag image for ECR
+    - name: Tag Docker image
+      run: |
+        docker tag $ECR_REPOSITORY:$COMMIT_SHA \
+        ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$COMMIT_SHA
 
-#     # Push to ECR
-#     - name: Push Docker image
-#       run: |
-#         docker push \
-#         ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$COMMIT_SHA
+    # Push to ECR
+    - name: Push Docker image
+      run: |
+        docker push \
+        ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$COMMIT_SHA
