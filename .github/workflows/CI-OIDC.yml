@@ -1,76 +1,52 @@
-########################################################################################
-#NAME OF THE USER INTERFACE FOR CICD PIPELINE
-########################################################################################
 name: Gradle Build, Push to ECR, and Terraform Deploy
 
-########################################################################################
-#RUNS ON WHICH MACHINE AND GIT BRANCH WHERE THE PIPELINE WILL BE ESCALATED.
-########################################################################################
 on:
   push:
     branches:
       - main
 
-########################################################################################
-#ALLOW MANUAL RUN FROM GITHUB UI
-########################################################################################
   workflow_dispatch:
-
-########################################################################################
-#ASKING USER WHAT YOU WANT TO DO?
-########################################################################################
     inputs:
       tf_action:
         description: "Terraform Action (apply/destroy)"
         required: true
         default: "apply"
 
-########################################################################################
-#GLOBAL VARIABLES FOR AWS ECR REGISTRY
-########################################################################################
 env:
   AWS_REGION: ca-central-1
   ECR_REPOSITORY: github-actions-ci-gradle-build
 
-########################################################################################
-#AWS OIDC LOGIN PERMISSIONS.
-########################################################################################
 permissions:
   id-token: write
   contents: read
 
-########################################################################################
-#JOBS TO PERFORM IN THE ACTION
-########################################################################################
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
-########################################################################################
-#LIST OF ACTIONS TO PERFORM.
-########################################################################################
     steps:
 
     # ================================
-    # CHECKOUT YOUR CURRENT REPOSITORY
+    # CHECKOUT CODE
     # ================================
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    # =========================
-    # TF ACTION SET
-    # =========================
+    # ================================
+    # SET TF ACTION
+    # ================================
     - name: Set TF_ACTION
       run: |
-        if [ "${{ github.event.inputs.tf_action }}" = "" ]; then
+        TF_INPUT="${{ github.event.inputs.tf_action }}"
+        if [ -z "$TF_INPUT" ]; then
           echo "TF_ACTION=apply" >> $GITHUB_ENV
         else
-          echo "TF_ACTION=${{ github.event.inputs.tf_action }}" >> $GITHUB_ENV
+          echo "TF_ACTION=$TF_INPUT" >> $GITHUB_ENV
         fi
 
-    # =========================
-    # BUILD EXECUTEABLE BINARY
-    # =========================
+    # ================================
+    # BUILD JAVA APP
+    # ================================
     - name: Setup Java
       uses: actions/setup-java@v4
       with:
@@ -83,50 +59,51 @@ jobs:
     - name: Build with Gradle
       run: ./gradlew build
 
-    # =========================
-    # SETUP IMAGE TAG + URI
-    # =========================
+    # ================================
+    # SET IMAGE TAG (MUTABLE)
+    # ================================
     - name: Set IMAGE_TAG
-      run: echo "IMAGE_TAG=$(git rev-parse --short HEAD)-${{ github.run_number }}" >> $GITHUB_ENV
+      run: echo "IMAGE_TAG=latest" >> $GITHUB_ENV
 
-    # =========================
-    # CREATE IAM ROLE
-    # =========================
+    # ================================
+    # AWS LOGIN
+    # ================================
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         role-to-assume: ${{ secrets.AWS_ASSUME_ROLE }}
         aws-region: ${{ env.AWS_REGION }}
 
-    # =========================
-    # LOGIN INTO ECR
-    # =========================
+    # ================================
+    # LOGIN TO ECR
+    # ================================
     - name: Login to ECR
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
 
+    # ================================
+    # SET IMAGE URI
+    # ================================
     - name: Set IMAGE_URI
       run: |
         echo "IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_ENV
 
-    # =========================
+    # ================================
     # DOCKER BUILD & PUSH
-    # =========================
+    # ================================
     - name: Build Docker image
       run: docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
 
     - name: Tag Docker image
-      run: |
-        docker tag $ECR_REPOSITORY:$IMAGE_TAG \
-        $IMAGE_URI
+      run: docker tag $ECR_REPOSITORY:$IMAGE_TAG $IMAGE_URI
 
     - name: Push Docker image
       if: env.TF_ACTION == 'apply'
       run: docker push $IMAGE_URI
 
-    # =========================
-    # TERRAFORM
-    # =========================
+    # ================================
+    # TERRAFORM SETUP
+    # ================================
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
 
@@ -134,23 +111,25 @@ jobs:
       working-directory: infra
       run: terraform init
 
-    # APPLY
+    # ================================
+    # TERRAFORM APPLY
+    # ================================
     - name: Terraform Apply
       if: env.TF_ACTION == 'apply'
       working-directory: infra
       run: |
         terraform plan -input=false \
-          -var="image_uri_001=$IMAGE_URI" \
+          -var="image_uri=$IMAGE_URI" \
           -out=tfplan
 
         terraform apply -auto-approve tfplan
 
-    # DESTROY
+    # ================================
+    # TERRAFORM DESTROY
+    # ================================
     - name: Terraform Destroy
       if: env.TF_ACTION == 'destroy'
       working-directory: infra
       run: |
         terraform destroy -auto-approve -input=false \
-        -var="image_uri_001=dummy"
-
-        
+          -var="image_uri=$IMAGE_URI"
